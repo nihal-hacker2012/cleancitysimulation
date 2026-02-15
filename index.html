@@ -1,249 +1,424 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Student Navigator</title>
-
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-tailwind.config = { darkMode: 'class' }
-</script>
-
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-<style>
-.map-container{
-  position:relative;
-  padding-bottom:56.25%;
-  border-radius:1.75rem;
-  overflow:hidden;
-  background:#020617;
-}
-.map-container iframe{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-}
-.glass{
-  background:rgba(255,255,255,.85);
-  backdrop-filter:blur(16px);
-}
-.dark .glass{
-  background:rgba(15,23,42,.8);
-}
-.fade{animation:fade .8s ease}
-@keyframes fade{
-  from{opacity:0;transform:translateY(20px)}
-  to{opacity:1}
-}
-.btn{
-  transition:.3s;
-}
-.btn:hover{
-  transform:translateY(-2px) scale(1.05);
-}
-.compass-wrap{
-  position:absolute;
-  top:1rem;
-  right:1rem;
-  width:96px;
-  height:96px;
-  border-radius:50%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:radial-gradient(circle at top,#1e293b,#020617);
-  z-index:20;
-}
-.compass-ring{
-  position:absolute;
-  inset:10px;
-  border-radius:50%;
-  border:2px dashed rgba(255,255,255,.4);
-  color:#93c5fd;
-}
-.compass-ring span{position:absolute;font-size:10px;font-weight:bold}
-.n{top:-6px;left:50%;transform:translateX(-50%)}
-.s{bottom:-6px;left:50%;transform:translateX(-50%)}
-.e{right:-6px;top:50%;transform:translateY(-50%)}
-.w{left:-6px;top:50%;transform:translateY(-50%)}
-.compass-needle{
-  font-size:30px;
-  color:#ef4444;
-}
-.compass-center{
-  width:10px;
-  height:10px;
-  border-radius:50%;
-  background:white;
-  position:absolute;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart City: Sewer & AI Segregation</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #0f172a; }
+        #ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(15, 23, 42, 0.95);
+            color: #f1f5f9;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            width: 280px;
+            z-index: 100;
+            border: 1px solid rgba(56, 189, 248, 0.4);
+        }
+        h2 { margin: 0 0 10px 0; color: #38bdf8; font-size: 1.1rem; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+        p { font-size: 0.75rem; color: #94a3b8; line-height: 1.5; margin-bottom: 15px; }
+        .controls { display: flex; flex-direction: column; gap: 8px; }
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.5px;
+        }
+        #day-night-btn { background: #334155; color: white; }
+        #trash-btn { background: #0ea5e9; color: white; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        .label-3d {
+            background: rgba(15, 23, 42, 0.9);
+            color: #38bdf8;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: bold;
+            border: 1px solid #38bdf8;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .ai-status {
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 10px;
+            color: #22c55e;
+            border-left: 2px solid #22c55e;
+        }
+    </style>
 </head>
+<body>
 
-<body class="bg-gradient-to-br from-indigo-50 via-sky-100 to-blue-200 dark:from-[#020617] dark:to-[#0f172a] min-h-screen">
-
-<nav class="sticky top-0 z-50 backdrop-blur bg-white/60 dark:bg-[#020617]/70">
-  <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-    <div class="flex items-center gap-3">
-      <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-        <i class="fa-solid fa-compass text-white"></i>
-      </div>
-      <h1 class="font-bold text-xl">Student Navigator</h1>
-    </div>
-    <button onclick="toggleDark()">
-      <i id="themeIcon" class="fa-solid fa-moon"></i>
-    </button>
-  </div>
-</nav>
-
-<main class="max-w-5xl mx-auto p-4 space-y-8 fade">
-
-<section class="glass rounded-3xl p-6 shadow">
-  <h2 class="text-2xl font-extrabold text-indigo-600">Navigate Smarter 🧭</h2>
-  <p class="mt-2 text-slate-600 dark:text-slate-300">
-    Live GPS location + smart compass
-  </p>
-</section>
-
-<section class="glass rounded-3xl p-6 shadow">
-  <h3 class="font-bold mb-4">Directions</h3>
-  <div class="grid sm:grid-cols-2 gap-3">
-    <input id="from" placeholder="From" class="p-3 rounded-xl border">
-    <input id="to" placeholder="To" class="p-3 rounded-xl border">
-  </div>
-  <div class="flex gap-3 mt-4 flex-wrap">
-    <button onclick="getDirections()" class="btn px-5 py-2 bg-indigo-600 text-white rounded-xl">Go</button>
-    <button onclick="savePlace()" class="btn px-5 py-2 bg-yellow-400 rounded-xl">⭐ Save</button>
-    <button onclick="openLiveLocation()" class="btn px-5 py-2 bg-green-500 text-white rounded-xl">
-      📍 My Location
-    </button>
-  </div>
-</section>
-
-<section class="glass rounded-3xl p-6 shadow">
-  <h3 class="font-bold mb-3">Favourite Places</h3>
-  <ul id="favList" class="space-y-2 text-sm"></ul>
-</section>
-
-<section>
-  <div class="map-container shadow-xl">
-
-    <!-- Animated Compass Overlay -->
-    <div class="compass-wrap">
-      <div id="ring" class="compass-ring">
-        <span class="n">N</span>
-        <span class="e">E</span>
-        <span class="s">S</span>
-        <span class="w">W</span>
-      </div>
-      <i id="needle" class="fa-solid fa-location-arrow compass-needle"></i>
-      <div class="compass-center"></div>
-    </div>
-
-    <!-- UPDATED MAP EMBED -->
-    <iframe
-      id="mapFrame"
-      src="https://www.google.com/maps/d/u/0/embed?mid=1PmlCPlkLLIiGndH9ZX7VSlJEuRWOxAA&ehbc=2E312F&noprof=1"
-      loading="lazy">
-    </iframe>
-
-  </div>
-</section>
-
-</main>
-
-<footer class="text-center text-sm text-slate-500 py-6">
-  @ Student Navigator
-</footer>
-
-<script>
-/* DARK MODE */
-function toggleDark(){
-  document.documentElement.classList.toggle("dark");
-  themeIcon.classList.toggle("fa-moon");
-  themeIcon.classList.toggle("fa-sun");
-}
-
-/* DIRECTIONS */
-function getDirections(){
-  if(!from.value || !to.value) return alert("Enter both locations");
-  window.open(`https://www.google.com/maps/dir/${from.value}/${to.value}`,"_blank");
-}
-
-/* FAVORITES */
-let favs = JSON.parse(localStorage.getItem("favs")) || [];
-const favList = document.getElementById("favList");
-
-function renderFavs(){
-  favList.innerHTML="";
-  favs.forEach((p,i)=>{
-    favList.innerHTML += `
-      <li class="flex justify-between bg-slate-100 p-3 rounded-xl">
-        <span>${p}</span>
-        <div class="flex gap-3">
-          <button onclick="goFav('${p}')" class="text-indigo-500">Go</button>
-          <button onclick="removeFav(${i})" class="text-red-500">✖</button>
+    <div id="ui-overlay">
+        <h2>Smart Sewer System</h2>
+        <p>Mixed waste dropped into street sewer openings is transported through transparent pipes, inspected by a rover, and sorted by AI.</p>
+        <div class="controls">
+            <button id="day-night-btn">🌙 Toggle Night Mode</button>
+            <button id="trash-btn">🗑️ Drop Waste into Sewer</button>
         </div>
-      </li>`;
-  });
-}
-renderFavs();
+        <div class="ai-status" id="status-log">ROVER STATUS: PATROLLING...</div>
+    </div>
 
-function savePlace(){
-  if(!to.value) return;
-  if(!favs.includes(to.value)){
-    favs.push(to.value);
-    localStorage.setItem("favs",JSON.stringify(favs));
-    renderFavs();
-  }
-}
-function removeFav(i){
-  favs.splice(i,1);
-  localStorage.setItem("favs",JSON.stringify(favs));
-  renderFavs();
-}
-function goFav(p){
-  window.open(`https://www.google.com/maps/search/${p}`,"_blank");
-}
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
 
-/* LIVE LOCATION */
-function openLiveLocation(){
-  if(!navigator.geolocation){
-    alert("Geolocation not supported");
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(pos=>{
-    const lat = pos.coords.latitude;
-    const lon = pos.coords.longitude;
-    window.open(`https://www.google.com/maps?q=${lat},${lon}`,"_blank");
-  },()=>{
-    alert("Location permission denied");
-  });
-}
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-/* COMPASS */
-const needle = document.getElementById("needle");
-const ring = document.getElementById("ring");
-let current = 0;
+        let scene, camera, renderer, labelRenderer, controls;
+        let isNight = false;
+        let trashItems = [];
+        let steamParticles = [];
+        let waterParticles = [];
+        let scannerLaser, pipeInspectionRover;
 
-if(window.DeviceOrientationEvent){
-  window.addEventListener("deviceorientation",e=>{
-    if(e.alpha!==null){
-      current += ((360 - e.alpha) - current)*0.15;
-      needle.style.transform = `rotate(${current}deg)`;
-      ring.style.transform = `rotate(${current}deg)`;
-    }
-  });
-}
-</script>
+        const CATEGORIES = [
+            { name: 'Organic', color: 0x22c55e, offsetZ: 20 },
+            { name: 'Plastic', color: 0xeab308, offsetZ: 0 },
+            { name: 'Metal', color: 0x64748b, offsetZ: -20 }
+        ];
 
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xb3e5fc);
+            
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(160, 100, 160);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            labelRenderer = new CSS2DRenderer();
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.domElement.style.position = 'absolute';
+            labelRenderer.domElement.style.top = '0px';
+            labelRenderer.domElement.style.pointerEvents = 'none';
+            document.body.appendChild(labelRenderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            sunLight.position.set(100, 100, 50);
+            sunLight.castShadow = true;
+            scene.add(sunLight);
+
+            // Ground Base
+            const baseGeo = new THREE.BoxGeometry(300, 45, 180);
+            const baseMat = new THREE.MeshStandardMaterial({ color: 0xf3f4f6 });
+            const base = new THREE.Mesh(baseGeo, baseMat);
+            base.position.y = -22.6;
+            scene.add(base);
+
+            // Surface
+            const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 180), new THREE.MeshStandardMaterial({ color: 0x10b981 }));
+            ground.rotation.x = -Math.PI / 2;
+            scene.add(ground);
+
+            const road = new THREE.Mesh(new THREE.PlaneGeometry(300, 40), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            road.rotation.x = -Math.PI / 2;
+            road.position.y = 0.05;
+            scene.add(road);
+
+            // 1. INDUSTRY SECTOR
+            createIndustry(-100, 0);
+            createAirFiltration(-60, 0);
+            createWaterFiltration(-60, -50);
+
+            // 2. SEWER OPENINGS
+            createSewerOpening(-20, 0);
+            createSewerOpening(30, 0);
+
+            // 3. UNDERGROUND PIPE & ROVER
+            createUndergroundSystem();
+
+            // 4. AI SEGREGATION BOXES
+            createSegregationBoxes(120, -20, 0);
+
+            document.getElementById('day-night-btn').addEventListener('click', toggleNight);
+            document.getElementById('trash-btn').addEventListener('click', dropTrash);
+        }
+
+        function createIndustry(x, z) {
+            const industry = new THREE.Group();
+            industry.position.set(x, 0, z);
+            const factory = new THREE.Mesh(new THREE.BoxGeometry(40, 30, 30), new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 }));
+            factory.position.y = 15;
+            industry.add(factory);
+
+            // Smoke/Air Source
+            for(let i=0; i<2; i++) {
+                const stack = new THREE.Mesh(new THREE.CylinderGeometry(3, 4, 40), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+                stack.position.set(-10 + i*20, 35, -5);
+                industry.add(stack);
+                for(let j=0; j<8; j++) {
+                    const p = new THREE.Mesh(new THREE.SphereGeometry(2), new THREE.MeshBasicMaterial({ color: 0x444444, transparent: true, opacity: 0.6 }));
+                    p.position.copy(stack.position).y += 22 + j*5;
+                    p.position.x += 10; // Start moving towards filter
+                    industry.add(p);
+                    steamParticles.push({ mesh: p, startX: p.position.x, startY: p.position.y });
+                }
+            }
+
+            // Water Source Pipe
+            const waterPipe = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 40), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            waterPipe.rotation.x = Math.PI / 2;
+            waterPipe.position.set(0, 5, -20);
+            industry.add(waterPipe);
+
+            // Dirty Water Flowing towards filter
+            for(let i=0; i<10; i++) {
+                const wp = new THREE.Mesh(new THREE.SphereGeometry(1.5), new THREE.MeshBasicMaterial({ color: 0x5d4037, transparent: true, opacity: 0.7 }));
+                wp.position.set(x + 10, 2, z - 25 - i*3);
+                scene.add(wp);
+                waterParticles.push({ mesh: wp, startZ: wp.position.z });
+            }
+
+            scene.add(industry);
+            addLabel("Industry Source", x, 55, z);
+        }
+
+        function createAirFiltration(x, z) {
+            const scrubber = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 35), new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.9 }));
+            scrubber.position.set(x, 17.5, z);
+            scene.add(scrubber);
+            addLabel("Air Scrubber", x, 40, z);
+        }
+
+        function createWaterFiltration(x, z) {
+            const tank = new THREE.Mesh(new THREE.CylinderGeometry(12, 12, 15), new THREE.MeshPhysicalMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.4 }));
+            tank.position.set(x, 7.5, z);
+            scene.add(tank);
+            addLabel("Water Filter", x, 20, z);
+
+            // Clean output pipe
+            const outPipe = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 20), new THREE.MeshStandardMaterial({ color: 0x64748b }));
+            outPipe.rotation.x = Math.PI/2;
+            outPipe.position.set(x, 5, z - 15);
+            scene.add(outPipe);
+        }
+
+        function createSewerOpening(x, z) {
+            const sewer = new THREE.Group();
+            sewer.position.set(x, 0.1, z);
+            const hole = new THREE.Mesh(new THREE.CircleGeometry(6, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+            hole.rotation.x = -Math.PI / 2;
+            sewer.add(hole);
+
+            const grate = new THREE.GridHelper(10, 5, 0x444444, 0x444444);
+            grate.position.y = 0.05;
+            sewer.add(grate);
+
+            // Vertical chute
+            const chute = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, 20), new THREE.MeshStandardMaterial({ color: 0x334155 }));
+            chute.position.y = -10;
+            sewer.add(chute);
+
+            scene.add(sewer);
+            addLabel("Mixed Waste Sewer", x, 15, z);
+        }
+
+        function createUndergroundSystem() {
+            // Transparent Main Pipe
+            const pipeGeo = new THREE.CylinderGeometry(6, 6, 200);
+            pipeGeo.rotateZ(Math.PI / 2);
+            const pipeMat = new THREE.MeshPhysicalMaterial({ 
+                color: 0x38bdf8, transparent: true, opacity: 0.25, transmission: 0.6, roughness: 0.1 
+            });
+            const pipe = new THREE.Mesh(pipeGeo, pipeMat);
+            pipe.position.set(30, -20, 0);
+            scene.add(pipe);
+
+            // Pipe Inspection Rover
+            pipeInspectionRover = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 4), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+            pipeInspectionRover.add(body);
+            const light = new THREE.PointLight(0xffffff, 20, 15);
+            light.position.set(3, 0, 0);
+            pipeInspectionRover.add(light);
+            pipeInspectionRover.position.set(0, -20, 0);
+            scene.add(pipeInspectionRover);
+            addLabel("Inspection Rover", 0, -12, 0);
+
+            // AI Scanner Hub (The Arch)
+            const hub = new THREE.Group();
+            hub.position.set(110, -20, 0);
+            const arch = new THREE.Mesh(new THREE.TorusGeometry(12, 1.5, 16, 32, Math.PI), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            arch.rotation.y = Math.PI/2;
+            hub.add(arch);
+
+            const laserGeo = new THREE.PlaneGeometry(20, 0.5);
+            const laserMat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
+            scannerLaser = new THREE.Mesh(laserGeo, laserMat);
+            scannerLaser.rotation.x = Math.PI/2;
+            hub.add(scannerLaser);
+
+            scene.add(hub);
+            addLabel("AI SCANNER", 110, -5, 0);
+        }
+
+        function createSegregationBoxes(x, y, z) {
+            CATEGORIES.forEach((cat, i) => {
+                const boxGroup = new THREE.Group();
+                boxGroup.position.set(x, y, cat.offsetZ);
+
+                const box = new THREE.Mesh(
+                    new THREE.BoxGeometry(15, 12, 15),
+                    new THREE.MeshStandardMaterial({ color: cat.color, transparent: true, opacity: 0.7 })
+                );
+                boxGroup.add(box);
+
+                const frame = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(new THREE.BoxGeometry(15, 12, 15)),
+                    new THREE.LineBasicMaterial({ color: 0xffffff })
+                );
+                boxGroup.add(frame);
+
+                scene.add(boxGroup);
+                addLabel(cat.name + " Storage", x, y + 10, cat.offsetZ);
+            });
+        }
+
+        function addLabel(text, x, y, z) {
+            const div = document.createElement('div');
+            div.className = 'label-3d';
+            div.textContent = text;
+            const label = new CSS2DObject(div);
+            label.position.set(x, y, z);
+            scene.add(label);
+        }
+
+        function toggleNight() {
+            isNight = !isNight;
+            scene.background.set(isNight ? 0x020617 : 0xb3e5fc);
+            document.getElementById('day-night-btn').textContent = isNight ? "☀️ Day Mode" : "🌙 Night Mode";
+        }
+
+        function dropTrash() {
+            const x = Math.random() > 0.5 ? -20 : 30;
+            const cat = CATEGORIES[Math.floor(Math.random()*3)];
+            const trash = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5), new THREE.MeshStandardMaterial({ color: 0x64748b }));
+            trash.position.set(x + (Math.random()-0.5)*4, 1, (Math.random()-0.5)*4);
+            trash.userData = { state: 'falling', type: cat, scanned: false };
+            scene.add(trash);
+            trashItems.push(trash);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = Date.now();
+
+            // Smoke Filtration Animation
+            steamParticles.forEach(p => {
+                p.mesh.position.x += 0.2; // Move toward scrubber
+                
+                // If past scrubber (x > -60), turn clean/white
+                if (p.mesh.position.x > -60 + 100) { // accounting for industry group x=-100
+                    p.mesh.material.color.set(0xffffff);
+                    p.mesh.material.opacity = 0.2;
+                } else {
+                    p.mesh.material.color.set(0x444444);
+                    p.mesh.material.opacity = 0.6;
+                }
+
+                if(p.mesh.position.x > 150) p.mesh.position.x = -10;
+            });
+
+            // Water Filtration Animation
+            waterParticles.forEach(p => {
+                p.mesh.position.z -= 0.15; // Move toward filter
+                
+                // If past filter (z < -50), turn blue/clean
+                if (p.mesh.position.z < -50) {
+                    p.mesh.material.color.set(0x0ea5e9);
+                    p.mesh.scale.setScalar(0.8);
+                } else {
+                    p.mesh.material.color.set(0x5d4037); // Brown/Dirty
+                    p.mesh.scale.setScalar(1.0);
+                }
+
+                if (p.mesh.position.z < -80) p.mesh.position.z = p.startZ;
+            });
+
+            // Rover Patrol Animation
+            if(pipeInspectionRover) {
+                pipeInspectionRover.position.x = 30 + Math.sin(time * 0.001) * 60;
+                pipeInspectionRover.rotation.y = (Math.cos(time * 0.001) > 0) ? 0 : Math.PI;
+            }
+
+            // Laser scan pulse
+            if(scannerLaser) {
+                scannerLaser.position.z = Math.sin(time * 0.008) * 10;
+            }
+
+            // Trash Logic
+            trashItems.forEach((t, i) => {
+                if(t.userData.state === 'falling') {
+                    t.position.y -= 0.6;
+                    if(t.position.y <= -20) t.userData.state = 'moving';
+                } else if(t.userData.state === 'moving') {
+                    t.position.x += 1.0;
+                    
+                    // Trigger Scan
+                    if(!t.userData.scanned && t.position.x > 105) {
+                        t.userData.scanned = true;
+                        t.material.color.set(t.userData.type.color);
+                        t.material.emissive.set(t.userData.type.color);
+                        t.material.emissiveIntensity = 2;
+                        document.getElementById('status-log').textContent = `AI DETECTED: ${t.userData.type.name.toUpperCase()}`;
+                    }
+
+                    // Sort to box
+                    if(t.userData.scanned && t.position.x > 115) {
+                        t.position.z += (t.userData.type.offsetZ - t.position.z) * 0.1;
+                        t.position.x += (120 - t.position.x) * 0.1;
+                        if(t.position.x > 119) {
+                            scene.remove(t);
+                            trashItems.splice(i, 1);
+                        }
+                    }
+                }
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
 </body>
 </html>
-
-
-
-
-
