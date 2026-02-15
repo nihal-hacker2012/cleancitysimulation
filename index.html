@@ -12,30 +12,33 @@
             left: 20px;
             background: rgba(15, 23, 42, 0.95);
             color: #f1f5f9;
-            padding: 20px;
-            border-radius: 12px;
+            padding: 15px;
+            border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            width: 280px;
+            width: 240px;
             z-index: 100;
             border: 1px solid rgba(56, 189, 248, 0.4);
         }
-        h2 { margin: 0 0 10px 0; color: #38bdf8; font-size: 1.1rem; border-bottom: 1px solid #334155; padding-bottom: 8px; }
-        p { font-size: 0.75rem; color: #94a3b8; line-height: 1.5; margin-bottom: 15px; }
-        .controls { display: flex; flex-direction: column; gap: 8px; }
+        h2 { margin: 0 0 8px 0; color: #38bdf8; font-size: 1rem; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+        p { font-size: 0.7rem; color: #94a3b8; line-height: 1.4; margin-bottom: 12px; }
+        .controls { display: flex; flex-direction: column; gap: 6px; }
         button {
-            padding: 10px;
+            padding: 8px;
             border: none;
-            border-radius: 6px;
+            border-radius: 5px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s;
             text-transform: uppercase;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             letter-spacing: 0.5px;
         }
         #day-night-btn { background: #334155; color: white; }
         #trash-btn { background: #0ea5e9; color: white; }
+        #xray-btn { background: #6366f1; color: white; }
         button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button.active { outline: 2px solid #fff; box-shadow: 0 0 10px #6366f1; }
+        
         .label-3d {
             background: rgba(15, 23, 42, 0.9);
             color: #38bdf8;
@@ -49,11 +52,11 @@
         }
         .ai-status {
             margin-top: 10px;
-            padding: 8px;
+            padding: 6px;
             background: rgba(0,0,0,0.3);
             border-radius: 4px;
             font-family: monospace;
-            font-size: 10px;
+            font-size: 9px;
             color: #22c55e;
             border-left: 2px solid #22c55e;
         }
@@ -62,11 +65,12 @@
 <body>
 
     <div id="ui-overlay">
-        <h2>Smart Sewer System</h2>
-        <p>Mixed waste dropped into <b>half-pipe</b> curb openings. An <b>Inspection Bot</b> monitors pipes by day, and the <b>Night-Bot</b> clears waste at night.</p>
+        <h2>Sewer Management</h2>
+        <p>Toggle <b>Underground View</b> to see only the pipe network and segregation hub. Click a pipe to simulate a leak.</p>
         <div class="controls">
-            <button id="day-night-btn">🌙 Toggle Night Mode</button>
-            <button id="trash-btn">🗑️ Drop Waste on Road</button>
+            <button id="xray-btn">🔭 Underground View</button>
+            <button id="day-night-btn">🌙 Night Mode</button>
+            <button id="trash-btn">🗑️ Drop Waste</button>
         </div>
         <div class="ai-status" id="status-log">SYSTEM STATUS: READY</div>
     </div>
@@ -86,11 +90,10 @@
         import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
         let scene, camera, renderer, labelRenderer, controls;
-        let isNight = false;
-        let trashItems = [];
-        let steamParticles = [];
-        let waterParticles = [];
+        let isNight = false, isXray = false;
+        let trashItems = [], steamParticles = [], waterParticles = [], pipes = [];
         let scannerLaser, nightBot, inspectionBot;
+        let currentLeak = null, surfaceGroup, industryGroup, segregationGroup;
 
         const CATEGORIES = [
             { name: 'Organic', color: 0x22c55e, offsetZ: 20 },
@@ -131,42 +134,48 @@
             sunLight.castShadow = true;
             scene.add(sunLight);
 
-            // Ground Base
+            // Ground Base (Keep separate so it can hide)
+            surfaceGroup = new THREE.Group();
             const baseGeo = new THREE.BoxGeometry(300, 45, 180);
             const baseMat = new THREE.MeshStandardMaterial({ color: 0xf3f4f6 });
             const base = new THREE.Mesh(baseGeo, baseMat);
             base.position.y = -22.6;
-            scene.add(base);
+            surfaceGroup.add(base);
 
-            // Surface
-            const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 180), new THREE.MeshStandardMaterial({ color: 0x10b981 }));
-            ground.rotation.x = -Math.PI / 2;
-            scene.add(ground);
+            const grass = new THREE.Mesh(new THREE.PlaneGeometry(300, 180), new THREE.MeshStandardMaterial({ color: 0x10b981 }));
+            grass.rotation.x = -Math.PI / 2;
+            surfaceGroup.add(grass);
 
             const road = new THREE.Mesh(new THREE.PlaneGeometry(300, 40), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
             road.rotation.x = -Math.PI / 2;
             road.position.y = 0.05;
-            scene.add(road);
+            surfaceGroup.add(road);
+            scene.add(surfaceGroup);
 
-            // 1. INDUSTRY SECTOR
+            // Industry
+            industryGroup = new THREE.Group();
             createIndustry(-100, 0);
             createAirFiltration(-60, 0);
             createWaterFiltration(-60, -50);
+            scene.add(industryGroup);
 
-            // 2. HALF-PIPE CURB OPENINGS
-            createHalfPipeCurb(-20, 20, 0); // Side A
-            createHalfPipeCurb(-20, -20, Math.PI); // Side B
+            // Undergound Components
+            createUndergroundSystem();
+            segregationGroup = new THREE.Group();
+            createSegregationBoxes(120, -20, 0);
+            scene.add(segregationGroup);
+
+            // Inlets
+            createHalfPipeCurb(-20, 20, 0); 
+            createHalfPipeCurb(-20, -20, Math.PI); 
             createHalfPipeCurb(40, 20, 0); 
             createHalfPipeCurb(40, -20, Math.PI); 
 
-            // 3. UNDERGROUND SYSTEM (Pipes & Bots)
-            createUndergroundSystem();
-
-            // 4. AI SEGREGATION BOXES
-            createSegregationBoxes(120, -20, 0);
-
+            // UI Events
             document.getElementById('day-night-btn').addEventListener('click', toggleNight);
             document.getElementById('trash-btn').addEventListener('click', dropTrash);
+            document.getElementById('xray-btn').addEventListener('click', toggleXray);
+            window.addEventListener('mousedown', onMouseDown);
         }
 
         function createIndustry(x, z) {
@@ -176,7 +185,6 @@
             factory.position.y = 15;
             industry.add(factory);
 
-            // Smoke
             for(let i=0; i<2; i++) {
                 const stack = new THREE.Mesh(new THREE.CylinderGeometry(3, 4, 40), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
                 stack.position.set(-10 + i*20, 35, -5);
@@ -189,124 +197,89 @@
                     steamParticles.push({ mesh: p, startX: p.position.x, startY: p.position.y });
                 }
             }
-
-            // Water Source
-            const waterPipe = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 40), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-            waterPipe.rotation.x = Math.PI / 2;
-            waterPipe.position.set(0, 5, -20);
-            industry.add(waterPipe);
-
-            for(let i=0; i<10; i++) {
-                const wp = new THREE.Mesh(new THREE.SphereGeometry(1.5), new THREE.MeshBasicMaterial({ color: 0x5d4037, transparent: true, opacity: 0.7 }));
-                wp.position.set(x + 10, 2, z - 25 - i*3);
-                scene.add(wp);
-                waterParticles.push({ mesh: wp, startZ: wp.position.z });
-            }
-
-            scene.add(industry);
-            addLabel("Industry Source", x, 55, z);
+            industryGroup.add(industry);
         }
 
         function createAirFiltration(x, z) {
             const scrubber = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 35), new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.9 }));
             scrubber.position.set(x, 17.5, z);
-            scene.add(scrubber);
-            addLabel("Air Scrubber", x, 40, z);
+            industryGroup.add(scrubber);
         }
 
         function createWaterFiltration(x, z) {
             const tank = new THREE.Mesh(new THREE.CylinderGeometry(12, 12, 15), new THREE.MeshPhysicalMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.4 }));
             tank.position.set(x, 7.5, z);
-            scene.add(tank);
-            addLabel("Water Filter", x, 20, z);
+            industryGroup.add(tank);
         }
 
         function createHalfPipeCurb(x, z, rotation) {
             const sewer = new THREE.Group();
             sewer.position.set(x, 0.5, z);
-            
-            // Half pipe cut opening
             const halfPipeGeo = new THREE.CylinderGeometry(4, 4, 15, 32, 1, true, 0, Math.PI);
             const halfPipeMat = new THREE.MeshStandardMaterial({ color: 0x334155, side: THREE.DoubleSide });
             const halfPipe = new THREE.Mesh(halfPipeGeo, halfPipeMat);
             halfPipe.rotation.z = Math.PI / 2;
             halfPipe.rotation.x = Math.PI / 2 + rotation;
             sewer.add(halfPipe);
-
-            // Pipe leading down
-            const chute = new THREE.Mesh(
-                new THREE.CylinderGeometry(3, 3, 22),
-                new THREE.MeshStandardMaterial({ color: 0x334155 })
-            );
+            const chute = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 22), new THREE.MeshStandardMaterial({ color: 0x334155 }));
             chute.position.y = -11;
             sewer.add(chute);
-
-            scene.add(sewer);
-            addLabel("Half-Pipe Inlet", x, 8, z);
+            surfaceGroup.add(sewer);
         }
 
         function createUndergroundSystem() {
-            // Transparent Main Pipe
-            const pipeGeo = new THREE.CylinderGeometry(6, 6, 260);
-            pipeGeo.rotateZ(Math.PI / 2);
-            const pipeMat = new THREE.MeshPhysicalMaterial({ 
-                color: 0x38bdf8, transparent: true, opacity: 0.2, transmission: 0.6 
-            });
-            const pipe = new THREE.Mesh(pipeGeo, pipeMat);
-            pipe.position.set(0, -20, 0);
-            scene.add(pipe);
+            const config = [
+                { z: 0, r: 6, color: 0x38bdf8, name: "Main Waste Pipe" },
+                { z: 15, r: 4, color: 0x4b5563, name: "Sewage Pipe A" },
+                { z: -15, r: 4, color: 0x4b5563, name: "Sewage Pipe B" }
+            ];
 
-            // Inspection Bot (Day Bot)
+            config.forEach(c => {
+                const geo = new THREE.CylinderGeometry(c.r, c.r, 260);
+                geo.rotateZ(Math.PI / 2);
+                const mat = new THREE.MeshPhysicalMaterial({ color: c.color, transparent: true, opacity: 0.5, transmission: 0.5 });
+                const p = new THREE.Mesh(geo, mat);
+                p.position.set(0, -20, c.z);
+                p.userData = { isPipe: true, zPos: c.z, label: c.name };
+                scene.add(p);
+                pipes.push(p);
+                addLabel(c.name, 0, -28, c.z);
+            });
+
             inspectionBot = new THREE.Group();
-            const iBody = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 6), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }));
+            const iBody = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 5), new THREE.MeshStandardMaterial({ color: 0x0ea5e9 }));
             iBody.rotation.z = Math.PI / 2;
             inspectionBot.add(iBody);
-            
-            const lens = new THREE.Mesh(new THREE.SphereGeometry(1.2), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
-            lens.position.x = 3.5;
+            const lens = new THREE.Mesh(new THREE.SphereGeometry(1), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
+            lens.position.x = 3;
             inspectionBot.add(lens);
-
-            const iLight = new THREE.PointLight(0x00ffff, 20, 10);
-            iLight.position.set(4, 0, 0);
+            const iLight = new THREE.PointLight(0x00ffff, 20, 15);
+            iLight.position.set(3, 0, 0);
             inspectionBot.add(iLight);
-
             inspectionBot.position.set(0, -20, 0);
+            inspectionBot.userData = { mode: 'idle' };
             scene.add(inspectionBot);
-            addLabel("Inspection Bot", 0, -14, 0);
 
-            // Night Bot - Heavy Pushing
             nightBot = new THREE.Group();
             const botBody = new THREE.Mesh(new THREE.BoxGeometry(10, 8, 8), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
             nightBot.add(botBody);
-            
             const plow = new THREE.Mesh(new THREE.BoxGeometry(2, 10, 10), new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
             plow.position.x = 6;
             nightBot.add(plow);
-
-            const botLight = new THREE.PointLight(0xff0000, 50, 20);
-            botLight.position.set(7, 0, 0);
-            nightBot.add(botLight);
-
             nightBot.position.set(-100, -20, 0);
             nightBot.visible = false;
             scene.add(nightBot);
-            addLabel("Night-Bot", -100, -10, 0);
 
-            // AI Scanner Hub
             const hub = new THREE.Group();
             hub.position.set(110, -20, 0);
             const arch = new THREE.Mesh(new THREE.TorusGeometry(12, 1.5, 16, 32, Math.PI), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
             arch.rotation.y = Math.PI/2;
             hub.add(arch);
-
-            const laserGeo = new THREE.PlaneGeometry(20, 0.5);
             const laserMat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
-            scannerLaser = new THREE.Mesh(laserGeo, laserMat);
+            scannerLaser = new THREE.Mesh(new THREE.PlaneGeometry(20, 0.5), laserMat);
             scannerLaser.rotation.x = Math.PI/2;
             hub.add(scannerLaser);
-
             scene.add(hub);
-            addLabel("AI SCANNER", 110, -5, 0);
         }
 
         function createSegregationBoxes(x, y, z) {
@@ -315,7 +288,7 @@
                 boxGroup.position.set(x, y, cat.offsetZ);
                 const box = new THREE.Mesh(new THREE.BoxGeometry(15, 12, 15), new THREE.MeshStandardMaterial({ color: cat.color, transparent: true, opacity: 0.7 }));
                 boxGroup.add(box);
-                scene.add(boxGroup);
+                segregationGroup.add(boxGroup);
                 addLabel(cat.name, x, y + 10, cat.offsetZ);
             });
         }
@@ -333,16 +306,60 @@
             isNight = !isNight;
             scene.background.set(isNight ? 0x020617 : 0xb3e5fc);
             document.getElementById('day-night-btn').textContent = isNight ? "☀️ Day Mode" : "🌙 Night Mode";
-            
             nightBot.visible = isNight;
-            inspectionBot.visible = !isNight;
+            if(!isNight) nightBot.position.x = -100;
+        }
 
-            if(!isNight) {
-                nightBot.position.x = -100;
-                document.getElementById('status-log').textContent = "INSPECTION BOT: SCANNING PIPES";
+        function toggleXray() {
+            isXray = !isXray;
+            const btn = document.getElementById('xray-btn');
+            btn.textContent = isXray ? "🏘️ Surface View" : "🔭 Underground View";
+            if(isXray) btn.classList.add('active'); else btn.classList.remove('active');
+
+            surfaceGroup.visible = !isXray;
+            industryGroup.visible = !isXray;
+            
+            if(isXray) {
+                camera.position.set(0, 0, 180);
+                controls.target.set(0, -20, 0);
             } else {
-                document.getElementById('status-log').textContent = "NIGHT-BOT: CLEARING WASTE";
+                camera.position.set(160, 100, 160);
+                controls.target.set(0, 0, 0);
             }
+        }
+
+        function onMouseDown(event) {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(pipes);
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                triggerLeak(hit.point, hit.object);
+            }
+        }
+
+        function triggerLeak(point, pipe) {
+            if (currentLeak) scene.remove(currentLeak);
+            
+            // Visual Leak: A jagged red ring
+            const leakGeo = new THREE.TorusGeometry(3, 0.4, 6, 20);
+            const leakMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            currentLeak = new THREE.Mesh(leakGeo, leakMat);
+            currentLeak.position.copy(point);
+            currentLeak.rotation.y = Math.PI/2;
+            scene.add(currentLeak);
+
+            // Command bot
+            inspectionBot.userData.mode = 'repair';
+            inspectionBot.userData.target = point.clone();
+            const log = document.getElementById('status-log');
+            log.textContent = `CRITICAL: LEAK IN ${pipe.userData.label.toUpperCase()}`;
+            log.style.color = "#ef4444";
+            log.style.borderLeftColor = "#ef4444";
         }
 
         function dropTrash() {
@@ -360,66 +377,60 @@
             requestAnimationFrame(animate);
             const time = Date.now();
 
-            // Particles
-            steamParticles.forEach(p => {
-                p.mesh.position.x += 0.2;
-                if (p.mesh.position.x > 40) { 
-                    p.mesh.material.color.set(0xffffff);
-                    p.mesh.material.opacity = 0.2;
-                } else p.mesh.material.color.set(0x444444);
-                if(p.mesh.position.x > 150) p.mesh.position.x = -10;
-            });
+            steamParticles.forEach(p => { p.mesh.position.x += 0.2; if(p.mesh.position.x > 150) p.mesh.position.x = -10; });
+            waterParticles.forEach(p => { p.mesh.position.z -= 0.15; if (p.mesh.position.z < -80) p.mesh.position.z = p.startZ; });
 
-            waterParticles.forEach(p => {
-                p.mesh.position.z -= 0.15;
-                if (p.mesh.position.z < -50) p.mesh.material.color.set(0x0ea5e9);
-                else p.mesh.material.color.set(0x5d4037);
-                if (p.mesh.position.z < -80) p.mesh.position.z = p.startZ;
-            });
-
-            // Inspection Bot (Day)
             if (!isNight && inspectionBot) {
-                inspectionBot.position.x = Math.sin(time * 0.001) * 80;
-                inspectionBot.rotation.y = (Math.cos(time * 0.001) > 0) ? 0 : Math.PI;
+                if(inspectionBot.userData.mode === 'repair') {
+                    const target = inspectionBot.userData.target;
+                    inspectionBot.position.x += (target.x - inspectionBot.position.x) * 0.08;
+                    inspectionBot.position.z += (target.z - inspectionBot.position.z) * 0.08;
+                    
+                    if(inspectionBot.position.distanceTo(target) < 1.5) {
+                        inspectionBot.userData.mode = 'fixing';
+                        document.getElementById('status-log').textContent = "REPAIR IN PROGRESS...";
+                        setTimeout(() => {
+                            if(currentLeak) scene.remove(currentLeak);
+                            currentLeak = null;
+                            inspectionBot.userData.mode = 'idle';
+                            const log = document.getElementById('status-log');
+                            log.textContent = "SYSTEM NOMINAL. RESUMING PATROL.";
+                            log.style.color = "#22c55e";
+                            log.style.borderLeftColor = "#22c55e";
+                        }, 1500);
+                    }
+                } else if(inspectionBot.userData.mode === 'idle') {
+                    const pipeIndex = Math.floor((time * 0.0002) % 3);
+                    const targetZ = [0, 15, -15][pipeIndex];
+                    inspectionBot.position.z += (targetZ - inspectionBot.position.z) * 0.05;
+                    inspectionBot.position.x = Math.sin(time * 0.001) * 90;
+                    inspectionBot.rotation.y = (Math.cos(time * 0.001) > 0) ? 0 : Math.PI;
+                }
             }
 
-            // Night Bot Movement
             if (isNight && nightBot.visible) {
                 nightBot.position.x += 0.5;
                 if (nightBot.position.x > 150) nightBot.position.x = -120;
             }
 
-            // Laser pulse
             if(scannerLaser) scannerLaser.position.z = Math.sin(time * 0.008) * 10;
 
-            // Trash Logic
             trashItems.forEach((t, i) => {
                 if(isNight && t.userData.state === 'on-road') {
                     t.position.y -= 0.5;
                     t.position.z += (0 - t.position.z) * 0.1;
                     if(t.position.y <= -20) t.userData.state = 'in-pipe';
                 }
-
                 if(t.userData.state === 'in-pipe') {
-                    if (nightBot.position.x > t.position.x - 10 && nightBot.position.x < t.position.x) {
-                        t.position.x = nightBot.position.x + 8;
-                    }
-
+                    if (nightBot.position.x > t.position.x - 10 && nightBot.position.x < t.position.x) t.position.x = nightBot.position.x + 8;
                     if(!t.userData.scanned && t.position.x > 105) {
                         t.userData.scanned = true;
                         t.material.color.set(t.userData.type.color);
-                        t.material.emissive.set(t.userData.type.color);
-                        t.material.emissiveIntensity = 2;
-                        document.getElementById('status-log').textContent = `AI SORTING: ${t.userData.type.name.toUpperCase()}`;
                     }
-
                     if(t.userData.scanned && t.position.x > 115) {
                         t.position.z += (t.userData.type.offsetZ - t.position.z) * 0.1;
                         t.position.x += (120 - t.position.x) * 0.1;
-                        if(t.position.x > 119) {
-                            scene.remove(t);
-                            trashItems.splice(i, 1);
-                        }
+                        if(t.position.x > 119) { scene.remove(t); trashItems.splice(i, 1); }
                     }
                 }
             });
